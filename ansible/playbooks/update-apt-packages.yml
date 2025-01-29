@@ -1,0 +1,50 @@
+- hosts: all
+
+  become: yes
+  tasks:
+    # Update package cache
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600  # Consider cache valid for 1 hour
+
+    # Upgrade all packages
+    - name: Upgrade all packages
+      apt:
+        upgrade: yes
+        force_apt_get: yes  # Use apt-get instead of aptitude for more reliable automation
+
+    # Fix any broken dependencies
+    - name: Fix broken dependencies
+      apt:
+        fix_broken: yes
+
+    # Remove unnecessary packages
+    - name: Remove unnecessary packages
+      apt:
+        autoremove: yes
+        purge: yes  # Also remove config files of removed packages
+
+    # Clean apt cache
+    - name: Clean apt cache
+      apt:
+        clean: yes
+        autoclean: yes  # Remove outdated package files
+
+    # Check if reboot is required
+    - name: Check if system reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    # Send Discord message when reboot is required
+    - name: Send Discord message
+      uri:
+        url: "{{ discord_webhook_url }}"
+        method: POST
+        body_format: json
+        body: '{"content": "Reboot required on {{ inventory_hostname }}"}'
+        headers:
+          Content-Type: application/json
+        status_code: 204
+      when: reboot_required.stat.exists
