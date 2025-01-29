@@ -14,11 +14,6 @@
         upgrade: yes
         force_apt_get: yes  # Use apt-get instead of aptitude for more reliable automation
 
-    # Fix any broken dependencies
-    - name: Fix broken dependencies
-      apt:
-        fix_broken: yes
-
     # Remove unnecessary packages
     - name: Remove unnecessary packages
       apt:
