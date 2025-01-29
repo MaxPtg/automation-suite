@@ -2,39 +2,22 @@
 
   become: yes
   tasks:
-    - name: Get detailed disk usage
-      shell: |
-        df -h | grep -vE '^tmpfs|^devtmpfs|^udev' | awk 'NR>1 {printf "%s:%s:%s:%s\n", $1, $2, $5, $6}'
-      register: disk_details
-      
-    - name: Get root partition usage percentage
+    - name: Get disk usage of root partition
+      shell: df -h / | awk 'NR==2 {print $5" used ("$3" of "$2")"}'
+      register: disk_usage
+
+    - name: Get root partition percentage only
       shell: df -h / | awk 'NR==2 {print $5}' | sed 's/%//'
-      register: root_usage
+      register: disk_percent
 
-    - name: Format disk usage message
-      set_fact:
-        disk_message: |
-          Disk usage report for {{ inventory_hostname }}:
-          {% for disk in disk_details.stdout_lines %}
-          {% set disk_info = disk.split(':') %}
-          • {{ disk_info[3] }} ({{ disk_info[0] }}):
-            - Size: {{ disk_info[1] }}
-            - Used: {{ disk_info[2] }}
-          {% endfor %}
-          
-          {% if root_usage.stdout|int > 80 %}
-          ⚠️ WARNING: Root partition usage is above 80%!
-          {% endif %}
-
-    # Send Discord message with full disk usage info
+    # Send Discord message with disk usage info
     - name: Send Discord message
       uri:
         url: "{{ discord_webhook_url }}"
         method: POST
         body_format: json
-        body: "{ content\": \"{{ disk_message | regex_replace('\n', '\\n') }} }"
+        body: '{ "content": "Disk Usage Report for {{ inventory_hostname }}:\nRoot partition: {{ disk_usage.stdout }}\n{% if disk_percent.stdout|int > 80 %}⚠️ WARNING: High disk usage detected!{% endif %}"}'
         headers:
           Content-Type: application/json
         status_code: 204
-      # Original condition commented out
-      # when: root_usage.stdout|int > 80
+      # when: disk_percent.stdout|int > 80
