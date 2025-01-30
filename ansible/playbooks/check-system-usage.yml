@@ -27,9 +27,9 @@
       register: root_usage
       changed_when: false
 
-    # Get simple memory stats
+    # Get simple memory stats and calculate percentage
     - name: Get memory usage
-      shell: free -h | awk 'NR==2 {print $2","$3","$7}'
+      shell: free | awk 'NR==2 {printf "%.0f,%.1fG,%.1fG,%.1f", ($2-$7)/$2*100, $2/1024/1024, ($2-$7)/1024/1024, $7/1024/1024}'
       register: memory_usage
       changed_when: false
 
@@ -38,19 +38,13 @@
       register: highest_disk_percent
       changed_when: false
 
-    - name: Set message color based on severity
-      set_fact:
-        message_color: >-
-          {{
-            severity_colors.critical if highest_disk_percent.stdout|int > 90
-            else severity_colors.warning if highest_disk_percent.stdout|int > 80
-            else severity_colors.normal
-          }}
-
     - name: Set parsed values
       set_fact:
         root_stats: "{{ root_usage.stdout.split(',') }}"
         mem_stats: "{{ memory_usage.stdout.split(',') }}"
+        disk_warning: "{{ '⚠️ ' if highest_disk_percent.stdout|int >= 80 else '' }}"
+        ram_warning: "{{ '⚠️ ' if mem_stats[0]|int >= 80 else '' }}"
+        message_color: "{{ severity_colors.warning if highest_disk_percent.stdout|int >= 80 or mem_stats[0]|int >= 80 else severity_colors.normal }}"
 
     - name: Send Discord notification
       uri:
@@ -70,13 +64,13 @@
                 "color": {{ message_color }},
                 "fields": [
                   {
-                    "name": "Root Partition",
+                    "name": "{{ disk_warning }}Root Partition",
                     "value": "Total: {{ root_stats[0] }} | Used: {{ root_stats[1] }} | Free: {{ root_stats[2] }} ({{ root_stats[3] }})",
                     "inline": true
                   },
                   {
-                    "name": "Memory",
-                    "value": "Total: {{ mem_stats[0] }} | Used: {{ mem_stats[1] }} | Available: {{ mem_stats[2] }}",
+                    "name": "{{ ram_warning }}Memory",
+                    "value": "Total: {{ mem_stats[1] }}G | Used: {{ mem_stats[2] }}G | Available: {{ mem_stats[3] }}G ({{ mem_stats[0] }}%)",
                     "inline": true
                   }
                 ],
@@ -89,4 +83,4 @@
         headers:
           Content-Type: application/json
         status_code: [204, 200]
-      when: highest_disk_percent.stdout|int > 80
+      when: highest_disk_percent.stdout|int >= 80 or mem_stats[0]|int >= 80
