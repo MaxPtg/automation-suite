@@ -6,7 +6,6 @@
       warning: 16776960  # Yellow
       critical: 15158332 # Red
   tasks:
-    # Gather basic system info
     - name: Get hostname
       command: hostname -f
       register: hostname
@@ -46,33 +45,46 @@
             else severity_colors.normal
           }}
 
-    # Send Discord notification with corrected JSON structure
     - name: Send Discord notification
       uri:
         url: "{{ discord_webhook_url }}"
         method: POST
         body_format: json
-        body:
-          username: "System Monitor"
-          embeds:
-            - author:
-                name: "{{ hostname.stdout }}"
-              title: "System Status Report"
-              description: "Status report for system monitoring"
-              color: "{{ message_color }}"
-              fields:
-                - name: "System Information"
-                  value: |
-                    **OS**: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}
-                    **Uptime**: {{ uptime.stdout }}
-                  inline: false
-                - name: "Memory Usage"
-                  value: "```{{ memory_info.stdout }}```"
-                  inline: false
-                - name: "Disk Usage"
-                  value: "```{{ disk_info.stdout }}```"
-                  inline: false
-              footer:
-                text: "Last updated: {{ ansible_date_time.iso8601 }}"
+        body: |
+          {
+            "username": "System Monitor",
+            "embeds": [
+              {
+                "author": {
+                  "name": "{{ hostname.stdout }}"
+                },
+                "title": "System Status Report",
+                "description": "Status report for system monitoring",
+                "color": {{ message_color }},
+                "fields": [
+                  {
+                    "name": "System Information",
+                    "value": "**OS**: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}\n**Uptime**: {{ uptime.stdout }}",
+                    "inline": false
+                  },
+                  {
+                    "name": "Memory Usage",
+                    "value": "```{{ memory_info.stdout }}```",
+                    "inline": false
+                  },
+                  {
+                    "name": "Disk Usage",
+                    "value": "```{{ disk_info.stdout }}```",
+                    "inline": false
+                  }
+                ],
+                "footer": {
+                  "text": "Last updated: {{ ansible_date_time.iso8601 }}"
+                }
+              }
+            ]
+          }
+        headers:
+          Content-Type: application/json
         status_code: [204, 200]
       when: highest_disk_percent.stdout|int > 80
