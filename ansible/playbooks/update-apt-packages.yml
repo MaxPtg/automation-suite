@@ -27,7 +27,6 @@
     # Clean apt cache
     - name: Clean apt cache
       apt:
-        clean: yes
         autoclean: yes  # Remove outdated package files
 
     # Check if reboot is required
