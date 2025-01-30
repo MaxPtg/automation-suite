@@ -1,13 +1,10 @@
 - hosts: all
   become: true
-
   vars:
-    # Define colors for different severity levels
     severity_colors:
       normal: 3066993    # Green
       warning: 16776960  # Yellow
       critical: 15158332 # Red
-  
   tasks:
     # Gather basic system info
     - name: Get hostname
@@ -25,25 +22,21 @@
       register: uptime
       changed_when: false
 
-    # Get disk usage for all mounted partitions
     - name: Get disk usage for all partitions
       command: df -h --output=source,target,size,used,avail,pcent
       register: disk_info
       changed_when: false
 
-    # Get memory usage
     - name: Get memory info
       command: free -h
       register: memory_info
       changed_when: false
 
-    # Calculate highest disk usage percentage
     - name: Get highest disk usage percentage
       shell: df --output=pcent / | tail -n 1 | tr -d '% '
       register: highest_disk_percent
       changed_when: false
 
-    # Determine severity color based on disk usage
     - name: Set message color based on severity
       set_fact:
         message_color: >-
@@ -53,55 +46,33 @@
             else severity_colors.normal
           }}
 
-    # Format disk usage information
-    - name: Format disk information
-      set_fact:
-        disk_fields: >-
-          {%- set fields = [] -%}
-          {%- for line in disk_info.stdout_lines[1:] -%}
-            {%- set parts = line.split() -%}
-            {%- if parts|length >= 6 -%}
-              {{- fields.append({
-                'name': 'Partition: ' ~ parts[1],
-                'value': 'Size: ' ~ parts[2] ~ '\nUsed: ' ~ parts[3] ~ ' (' ~ parts[5] ~ ')\nFree: ' ~ parts[4],
-                'inline': true
-              }) -}}
-            {%- endif -%}
-          {%- endfor -%}
-          {{- fields -}}
-
-    # Send Discord notification
+    # Send Discord notification with corrected JSON structure
     - name: Send Discord notification
       uri:
         url: "{{ discord_webhook_url }}"
         method: POST
         body_format: json
-        body: |
-          {
-            "embeds": [{
-              "title": "System Status Report",
-              "description": "Status report for **{{ hostname.stdout }}**",
-              "color": {{ message_color }},
-              "fields": [
-                {
-                  "name": "System Information",
-                  "value": "OS: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}\nUptime: {{ uptime.stdout }}"
-                },
-                {
-                  "name": "Memory Usage",
-                  "value": "```{{ memory_info.stdout }}```"
-                }
-              ]
-              {%- if disk_fields|length > 0 -%}
-              ,
-              "fields": {{ disk_fields }}
-              {%- endif -%},
-              "footer": {
-                "text": "Last updated: {{ ansible_date_time.iso8601 }}"
-              }
-            }]
-          }
-        headers:
-          Content-Type: application/json
-        status_code: [204, 200]  # Discord can return either
+        body:
+          username: "System Monitor"
+          embeds:
+            - author:
+                name: "{{ hostname.stdout }}"
+              title: "System Status Report"
+              description: "Status report for system monitoring"
+              color: "{{ message_color }}"
+              fields:
+                - name: "System Information"
+                  value: |
+                    **OS**: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}
+                    **Uptime**: {{ uptime.stdout }}
+                  inline: false
+                - name: "Memory Usage"
+                  value: "```{{ memory_info.stdout }}```"
+                  inline: false
+                - name: "Disk Usage"
+                  value: "```{{ disk_info.stdout }}```"
+                  inline: false
+              footer:
+                text: "Last updated: {{ ansible_date_time.iso8601 }}"
+        status_code: [204, 200]
       when: highest_disk_percent.stdout|int > 80
