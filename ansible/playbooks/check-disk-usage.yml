@@ -12,23 +12,25 @@
       changed_when: false
 
     - name: Get OS info
-      command: cat /etc/os-release
+      shell: grep PRETTY_NAME /etc/os-release | cut -d'"' -f2
       register: os_info
       changed_when: false
 
     - name: Get system uptime
-      command: uptime -p
+      shell: uptime -p | sed 's/up //'
       register: uptime
       changed_when: false
 
-    - name: Get disk usage for all partitions
-      command: df -h --output=source,target,size,used,avail,pcent
-      register: disk_info
+    # Get root partition usage only
+    - name: Get root partition usage
+      shell: df -h / | awk 'NR==2 {print $2","$3","$4","$5}'
+      register: root_usage
       changed_when: false
 
-    - name: Get memory info
-      command: free -h
-      register: memory_info
+    # Get simple memory stats
+    - name: Get memory usage
+      shell: free -h | awk 'NR==2 {print $2","$3","$7}'
+      register: memory_usage
       changed_when: false
 
     - name: Get highest disk usage percentage
@@ -45,44 +47,11 @@
             else severity_colors.normal
           }}
 
-    # Debug the body before sending
-    - name: Print Discord message body
-      debug:
-        msg: |
-          {
-            "username": "System Monitor",
-            "embeds": [
-              {
-                "author": {
-                  "name": "{{ hostname.stdout }}"
-                },
-                "title": "System Status Report",
-                "description": "Status report for system monitoring",
-                "color": {{ message_color }},
-                "fields": [
-                  {
-                    "name": "System Information",
-                    "value": "**OS**: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}\n**Uptime**: {{ uptime.stdout }}",
-                    "inline": false
-                  },
-                  {
-                    "name": "Memory Usage",
-                    "value": "```{{ memory_info.stdout }}```",
-                    "inline": false
-                  },
-                  {
-                    "name": "Disk Usage",
-                    "value": "```{{ disk_info.stdout }}```",
-                    "inline": false
-                  }
-                ],
-                "footer": {
-                  "text": "Last updated: {{ ansible_date_time.iso8601 }}"
-                }
-              }
-            ]
-          }
-          
+    - name: Set parsed values
+      set_fact:
+        root_stats: "{{ root_usage.stdout.split(',') }}"
+        mem_stats: "{{ memory_usage.stdout.split(',') }}"
+
     - name: Send Discord notification
       uri:
         url: "{{ discord_webhook_url }}"
@@ -97,23 +66,18 @@
                   "name": "{{ hostname.stdout }}"
                 },
                 "title": "System Status Report",
-                "description": "Status report for system monitoring",
+                "description": "**OS**: {{ os_info.stdout }}\n**Uptime**: {{ uptime.stdout }}",
                 "color": {{ message_color }},
                 "fields": [
                   {
-                    "name": "System Information",
-                    "value": "**OS**: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}\n**Uptime**: {{ uptime.stdout }}",
-                    "inline": false
+                    "name": "Root Partition",
+                    "value": "Total: {{ root_stats[0] }} | Used: {{ root_stats[1] }} | Free: {{ root_stats[2] }} ({{ root_stats[3] }})",
+                    "inline": true
                   },
                   {
-                    "name": "Memory Usage",
-                    "value": "```{{ memory_info.stdout }}```",
-                    "inline": false
-                  },
-                  {
-                    "name": "Disk Usage",
-                    "value": "```{{ disk_info.stdout }}```",
-                    "inline": false
+                    "name": "Memory",
+                    "value": "Total: {{ mem_stats[0] }} | Used: {{ mem_stats[1] }} | Available: {{ mem_stats[2] }}",
+                    "inline": true
                   }
                 ],
                 "footer": {
