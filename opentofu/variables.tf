@@ -1,9 +1,17 @@
+/* ===== PVE Settings ===== */
 variable "pm_api_token_secret" {
   type = string
   sensitive = true
   description = "Proxmox API token secret"
 }
 
+variable "pve_node" {
+  type = string
+  default = "pve-main"
+  description = "Proxmox destination node"
+}
+
+/* ===== Container Settings ===== */
 variable "container_id" {
   type = number
   description = "Container ID (200-254)"

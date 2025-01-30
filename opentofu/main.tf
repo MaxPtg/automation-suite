@@ -6,7 +6,7 @@ locals {
 }
 
 resource "proxmox_lxc" "container" {
-  target_node = "pve"
+  target_node = var.pve_node
   hostname    = var.hostname
   ostemplate  = local.templates[var.os_type]
   vmid        = var.container_id
