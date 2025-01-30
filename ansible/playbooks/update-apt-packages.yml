@@ -1,6 +1,10 @@
-- hosts: all
-
-  become: yes
+---
+- name: Debian/Ubuntu - Update apt packages
+  hosts: all
+  become: true
+  become_method: sudo
+  gather_facts: true
+  
   tasks:
     # Update package cache
     - name: Update apt cache

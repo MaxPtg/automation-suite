@@ -1,6 +1,6 @@
 - hosts: all
 
-  become: yes
+  become: true
   tasks:
     - name: Get disk usage of root partition
       shell: df -h / | awk 'NR==2 {print $5" used ("$3" of "$2")"}'
