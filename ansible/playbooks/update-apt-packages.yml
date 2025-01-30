@@ -24,11 +24,6 @@
         autoremove: yes
         purge: yes  # Also remove config files of removed packages
 
-    # Clean apt cache
-    - name: Clean apt cache
-      apt:
-        autoclean: yes  # Remove outdated package files
-
     # Check if reboot is required
     - name: Check if system reboot is required
       stat:
