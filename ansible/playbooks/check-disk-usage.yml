@@ -45,6 +45,44 @@
             else severity_colors.normal
           }}
 
+    # Debug the body before sending
+    - name: Print Discord message body
+      debug:
+        msg: |
+          {
+            "username": "System Monitor",
+            "embeds": [
+              {
+                "author": {
+                  "name": "{{ hostname.stdout }}"
+                },
+                "title": "System Status Report",
+                "description": "Status report for system monitoring",
+                "color": {{ message_color }},
+                "fields": [
+                  {
+                    "name": "System Information",
+                    "value": "**OS**: {{ os_info.stdout_lines[1] | regex_replace('^NAME=|\"', '') }}\n**Uptime**: {{ uptime.stdout }}",
+                    "inline": false
+                  },
+                  {
+                    "name": "Memory Usage",
+                    "value": "```{{ memory_info.stdout }}```",
+                    "inline": false
+                  },
+                  {
+                    "name": "Disk Usage",
+                    "value": "```{{ disk_info.stdout }}```",
+                    "inline": false
+                  }
+                ],
+                "footer": {
+                  "text": "Last updated: {{ ansible_date_time.iso8601 }}"
+                }
+              }
+            ]
+          }
+          
     - name: Send Discord notification
       uri:
         url: "{{ discord_webhook_url }}"
