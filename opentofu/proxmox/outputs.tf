@@ -6,6 +6,10 @@ output "container_id" {
   value = proxmox_lxc.container.vmid
 }
 
-output "container_status" {
-  value = proxmox_lxc.container.status
+output "container_hostname" {
+  value = proxmox_lxc.container.hostname
+}
+
+output "container_unprivileged" {
+  value = proxmox_lxc.container.unprivileged
 }
